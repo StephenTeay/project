@@ -7,6 +7,7 @@ import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn_v2, FasterRCNN_ResNet50_FPN_V2_Weights
 from torchvision.utils import draw_bounding_boxes
 
+st.set_page_config(page_title='Object Detection', page_icon=':books:')
 weights = FasterRCNN_ResNet50_FPN_V2_Weights.DEFAULT
 categories = weights.meta["categories"] ## ['__background__', 'person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 'fire hydrant', 'N/A', 'stopsign',]
 img_preprocess = weights.transforms() ## Scales values from 0-255 range to 0-1 range.
@@ -34,7 +35,7 @@ def create_image_with_bboxes(img, prediction): ## Adds Bounding Boxes around ori
     return img_with_bboxes_np
 
 ## Dashboard
-st.set_page_config(page_title='Object Detection', page_icon=':books:')
+
 st.title("Object Detector :tea: :coffee:")
 upload = st.file_uploader(label="Upload Image Here:", type=["png", "jpg", "jpeg"])
 

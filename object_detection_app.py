@@ -34,6 +34,7 @@ def create_image_with_bboxes(img, prediction): ## Adds Bounding Boxes around ori
     return img_with_bboxes_np
 
 ## Dashboard
+st.set_page_config(page_title='Object Detection', page_icon=':books:')
 st.title("Object Detector :tea: :coffee:")
 upload = st.file_uploader(label="Upload Image Here:", type=["png", "jpg", "jpeg"])
 

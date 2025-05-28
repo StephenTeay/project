@@ -1,11 +1,10 @@
-streamlit==1.28.0
-torch==2.1.0+cpu
-torchvision==0.16.0+cpu
-numpy==1.26.0
-pandas==2.1.1
-pillow==10.0.0
-streamlit-webrtc==0.47.1
-av==10.0.0
-opencv-python-headless==4.8.0.76
-protobuf==3.20.3  # Required for ONNX compatibility
-pyyaml==6.0.1
+streamlit>=1.28.0
+torch>=2.0.0
+torchvision>=0.15.0
+numpy>=1.24.0
+pandas>=2.0.0
+pillow>=10.0.0
+streamlit-webrtc>=0.47.0
+av>=10.0.0
+transformers>=4.30.0
+protobuf>=3.20.0

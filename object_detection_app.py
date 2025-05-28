@@ -12,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFont
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import logging
 import tempfile
+import av
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -235,17 +236,65 @@ RTC_CONFIGURATION = RTCConfiguration({
 })
 
 def video_frame_callback(frame):
-    """Process video frames - runs in separate thread"""
+    """Process video frames and return modified frame with detections"""
     try:
+        # Convert av.VideoFrame to PIL Image
         img = frame.to_image()
+        
+        # Run object detection
         prediction = detect_objects_in_image(img)
         
-        # Update thread-safe statistics instead of session_state
+        # Update thread-safe statistics
         update_thread_statistics(prediction)
+        
+        # Draw bounding boxes on the image
+        if prediction["labels"]:
+            img_with_boxes = draw_boxes_on_image(img, prediction)
+        else:
+            img_with_boxes = img
+        
+        # Convert back to av.VideoFrame
+        new_frame = av.VideoFrame.from_image(img_with_boxes)
+        
+        return new_frame
         
     except Exception as e:
         logger.error(f"Frame processing error: {str(e)}")
-    return frame
+        return frame  # Return original frame if processing fails
+
+# Alternative video processor class for better control
+class VideoProcessor:
+    def __init__(self):
+        self.frame_count = 0
+        self.detection_interval = 5  # Process every 5th frame for performance
+        
+    def recv(self, frame):
+        """Process incoming video frame"""
+        try:
+            self.frame_count += 1
+            
+            # Only process every nth frame to improve performance
+            if self.frame_count % self.detection_interval == 0:
+                # Convert to PIL Image
+                img = frame.to_image()
+                
+                # Run detection
+                prediction = detect_objects_in_image(img)
+                
+                # Update statistics
+                update_thread_statistics(prediction)
+                
+                # Draw bounding boxes
+                if prediction["labels"]:
+                    img_with_boxes = draw_boxes_on_image(img, prediction)
+                    # Convert back to frame
+                    return av.VideoFrame.from_image(img_with_boxes)
+            
+            return frame
+            
+        except Exception as e:
+            logger.error(f"Video processing error: {str(e)}")
+            return frame
 
 # Main UI
 st.title("🎥 AI Object Detection System")
@@ -261,6 +310,17 @@ with st.sidebar:
         ["📤 Upload Images", "📹 Live Camera"],
         help="Upload mode works everywhere. Camera mode may have limitations on some platforms."
     )
+    
+    st.divider()
+    
+    # Video processing options (only show for camera mode)
+    if detection_mode == "📹 Live Camera":
+        st.subheader("⚙️ Video Settings")
+        processing_mode = st.selectbox(
+            "Processing Mode:",
+            ["Standard", "Performance"],
+            help="Performance mode processes fewer frames for better speed"
+        )
     
     st.divider()
     
@@ -370,21 +430,41 @@ elif detection_mode == "📹 Live Camera":
     st.warning("⚠️ **Note:** Camera functionality may be limited on some cloud platforms. If it doesn't work, try Upload mode instead.")
     
     try:
-        ctx = webrtc_streamer(
-            key="object-detector-streamlit-cloud",
-            mode=WebRtcMode.SENDRECV,
-            rtc_configuration=RTC_CONFIGURATION,
-            video_frame_callback=video_frame_callback,
-            media_stream_constraints={
-                "video": {
-                    "width": {"min": 320, "ideal": 640, "max": 1280},
-                    "height": {"min": 240, "ideal": 480, "max": 720},
-                    "frameRate": {"min": 5, "ideal": 10, "max": 15}
-                }, 
-                "audio": False
-            },
-            async_processing=True
-        )
+        # Choose processor based on mode
+        if 'processing_mode' in locals() and processing_mode == "Performance":
+            processor = VideoProcessor()
+            
+            ctx = webrtc_streamer(
+                key="object-detector-performance",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=RTC_CONFIGURATION,
+                video_processor_factory=lambda: processor,
+                media_stream_constraints={
+                    "video": {
+                        "width": {"min": 320, "ideal": 480, "max": 640},
+                        "height": {"min": 240, "ideal": 360, "max": 480},
+                        "frameRate": {"min": 5, "ideal": 8, "max": 12}
+                    }, 
+                    "audio": False
+                },
+                async_processing=True
+            )
+        else:
+            ctx = webrtc_streamer(
+                key="object-detector-standard",
+                mode=WebRtcMode.SENDRECV,
+                rtc_configuration=RTC_CONFIGURATION,
+                video_frame_callback=video_frame_callback,
+                media_stream_constraints={
+                    "video": {
+                        "width": {"min": 320, "ideal": 640, "max": 1280},
+                        "height": {"min": 240, "ideal": 480, "max": 720},
+                        "frameRate": {"min": 5, "ideal": 10, "max": 15}
+                    }, 
+                    "audio": False
+                },
+                async_processing=True
+            )
         
         # Connection status
         status_placeholder = st.empty()
@@ -392,10 +472,22 @@ elif detection_mode == "📹 Live Camera":
         if ctx.state.playing:
             status_placeholder.success("✅ Camera active - AI detection running in real-time!")
             
+            # Real-time stats display
+            stats_placeholder = st.empty()
+            
             # Add sync button when camera is active
-            if st.button("🔄 Sync Stats", help="Sync detection statistics from video stream"):
-                sync_thread_stats_to_session()
-                st.rerun()
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                if st.button("🔄 Sync Stats", help="Sync detection statistics from video stream"):
+                    sync_thread_stats_to_session()
+                    st.rerun()
+            
+            with col2:
+                if st.button("⏹️ Stop & Save", help="Stop camera and save current statistics"):
+                    sync_thread_stats_to_session()
+                    if st.session_state.label_stats:
+                        log_predictions()
+                    st.rerun()
                 
         elif ctx.state.signalling:
             status_placeholder.info("🔄 Connecting to camera... Please wait.")

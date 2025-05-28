@@ -181,9 +181,9 @@ RTC_CONFIGURATION = RTCConfiguration({
         {"urls": ["stun:stun.cloudflare.com:3478"]},
         {"urls": ["stun:openrelay.metered.ca:80"]},
         {
-            "urls": ["turn:openrelay.metered.ca:80"],
-            "username": "openrelayproject",
-            "credential": "openrelayproject"
+            "urls": ["turn:relay1.expressturn.com:3480"],
+            "username": "000000002063793301",
+            "credential": "7Dfdi1EmR3bo6lc4JTfMqkNCqyI="
         }
     ],
     "iceCandidatePoolSize": 10,

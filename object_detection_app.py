@@ -389,14 +389,14 @@ elif detection_mode == "📹 Live Camera":
         # Connection status
         status_placeholder = st.empty()
         
-    if ctx.state.playing:
-        status_placeholder.success("✅ Camera active - AI detection running in real-time!")
+if ctx.state.playing:
+    status_placeholder.success("✅ Camera active - AI detection running in real-time!")
     
     
     # Add sync button when camera is active
     if st.button("🔄 Sync Stats", help="Sync detection statistics from video stream"):
-        sync_thread_stats_to_session()
-        st.rerun()
+            sync_thread_stats_to_session()
+            st.rerun()
         
 elif ctx.state.signalling:
     status_placeholder.info("🔄 Connecting to camera... Please wait.")

@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 CACHE_DIR = Path.home() / ".cache" / "object_detector"
 LOG_DIR = Path.home() / ".cache" / "logs"
 
+# Thread-safe statistics storage
 thread_stats_lock = threading.Lock()
 thread_label_stats = defaultdict(lambda: {"count": 0, "total_score": 0.0, "max_score": 0.0})
 
@@ -151,6 +152,44 @@ def update_statistics(prediction):
                 float(score)
             )
 
+def update_thread_statistics(prediction):
+    """Update detection statistics in thread-safe manner"""
+    global thread_label_stats, thread_stats_lock
+    
+    with thread_stats_lock:
+        for label, score in zip(prediction["labels"], prediction["scores"]):
+            if float(score) > 0.5:  # Only count high-confidence detections
+                thread_label_stats[label]["count"] += 1
+                thread_label_stats[label]["total_score"] += float(score)
+                thread_label_stats[label]["max_score"] = max(
+                    thread_label_stats[label]["max_score"], 
+                    float(score)
+                )
+
+def sync_thread_stats_to_session():
+    """Sync thread statistics to session state"""
+    global thread_label_stats, thread_stats_lock
+    
+    with thread_stats_lock:
+        for label, data in thread_label_stats.items():
+            if label not in st.session_state.label_stats:
+                st.session_state.label_stats[label] = {
+                    "count": 0,
+                    "total_score": 0.0,
+                    "max_score": 0.0
+                }
+            
+            # Add thread stats to session stats
+            st.session_state.label_stats[label]["count"] += data["count"]
+            st.session_state.label_stats[label]["total_score"] += data["total_score"]
+            st.session_state.label_stats[label]["max_score"] = max(
+                st.session_state.label_stats[label]["max_score"],
+                data["max_score"]
+            )
+        
+        # Clear thread stats after syncing
+        thread_label_stats.clear()
+
 def log_predictions():
     """Log prediction statistics to file"""
     try:
@@ -207,45 +246,6 @@ def video_frame_callback(frame):
     except Exception as e:
         logger.error(f"Frame processing error: {str(e)}")
     return frame
-
-def update_thread_statistics(prediction):
-    """Update detection statistics in thread-safe manner"""
-    global thread_label_stats, thread_stats_lock
-    
-    with thread_stats_lock:
-        for label, score in zip(prediction["labels"], prediction["scores"]):
-            if float(score) > 0.5:  # Only count high-confidence detections
-                thread_label_stats[label]["count"] += 1
-                thread_label_stats[label]["total_score"] += float(score)
-                thread_label_stats[label]["max_score"] = max(
-                    thread_label_stats[label]["max_score"], 
-                    float(score)
-                )
-
-def sync_thread_stats_to_session():
-    """Sync thread statistics to session state"""
-    global thread_label_stats, thread_stats_lock
-    
-    with thread_stats_lock:
-        for label, data in thread_label_stats.items():
-            if label not in st.session_state.label_stats:
-                st.session_state.label_stats[label] = {
-                    "count": 0,
-                    "total_score": 0.0,
-                    "max_score": 0.0
-                }
-            
-            # Add thread stats to session stats
-            st.session_state.label_stats[label]["count"] += data["count"]
-            st.session_state.label_stats[label]["total_score"] += data["total_score"]
-            st.session_state.label_stats[label]["max_score"] = max(
-                st.session_state.label_stats[label]["max_score"],
-                data["max_score"]
-            )
-        
-        # Clear thread stats after syncing
-        thread_label_stats.clear()
-
 
 # Main UI
 st.title("🎥 AI Object Detection System")
@@ -389,19 +389,18 @@ elif detection_mode == "📹 Live Camera":
         # Connection status
         status_placeholder = st.empty()
         
-if ctx.state.playing:
-    status_placeholder.success("✅ Camera active - AI detection running in real-time!")
-    
-    
-    # Add sync button when camera is active
-    if st.button("🔄 Sync Stats", help="Sync detection statistics from video stream"):
-            sync_thread_stats_to_session()
-            st.rerun()
-        
-elif ctx.state.signalling:
-    status_placeholder.info("🔄 Connecting to camera... Please wait.")
-else:
-    status_placeholder.info("📷 Click **START** to begin live detection")
+        if ctx.state.playing:
+            status_placeholder.success("✅ Camera active - AI detection running in real-time!")
+            
+            # Add sync button when camera is active
+            if st.button("🔄 Sync Stats", help="Sync detection statistics from video stream"):
+                sync_thread_stats_to_session()
+                st.rerun()
+                
+        elif ctx.state.signalling:
+            status_placeholder.info("🔄 Connecting to camera... Please wait.")
+        else:
+            status_placeholder.info("📷 Click **START** to begin live detection")
             
     except Exception as e:
         st.error(f"❌ Camera initialization failed: {str(e)}")

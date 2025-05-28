@@ -378,7 +378,7 @@ if detection_mode == "📤 Upload Images":
                 
                 with col1:
                     st.write("**Original Image**")
-                    st.image(image, use_column_width=True)
+                    st.image(image, use_container_width=True)
                 
                 # Detect objects
                 with st.spinner("🔍 Detecting objects..."):
@@ -392,9 +392,9 @@ if detection_mode == "📤 Upload Images":
                     if prediction["labels"]:
                         # Draw bounding boxes
                         img_with_boxes = draw_boxes_on_image(image, prediction)
-                        st.image(img_with_boxes, use_column_width=True)
+                        st.image(img_with_boxes, use_container_width=True)
                     else:
-                        st.image(image, use_column_width=True)
+                        st.image(image, use_container_width=True)
                         st.info("No objects detected with high confidence")
                 
                 # Show detection details

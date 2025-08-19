@@ -545,10 +545,11 @@ st.markdown("---")
 st.markdown(
     """
     <div style='text-align: center'>
-        <p>🚀 <strong>AI Object Detection</strong> | Built with Streamlit & PyTorch By Hannah & Stephen </p>
+        <p>🚀 <strong>AI Object Detection</strong> | Built with Streamlit & PyTorch by Hannah & Stephen </p>
         <p><small>Detects 80+ object categories with state-of-the-art accuracy</small></p>
     </div>
     """, 
     unsafe_allow_html=True
 )
+
 
